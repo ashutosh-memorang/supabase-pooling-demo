@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pool Isolation Demo</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --text: #1b1f24; --muted: #5d6673; --border: #dde1e6;
+    --ok: #1a7f37; --ok-soft: #e6f4ea; --bad: #c62828; --bad-soft: #fdecea;
+    --warn: #9a6700; --warn-soft: #fff4d6; --info: #0b5cad; --info-soft: #e8f1fb;
+    --code: #f0f2f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --surface: #171b21; --text: #e6e9ed; --muted: #9aa4b1; --border: #2a313a;
+      --ok: #4ac26b; --ok-soft: #12261a; --bad: #ff6b6b; --bad-soft: #2d1515;
+      --warn: #e3b341; --warn-soft: #2b2310; --info: #58a6ff; --info-soft: #10213a; --code: #1f252d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 18px; margin: 0; }
+  h3 { font-size: 14px; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 6px 0; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: 0.92em; }
+  .muted { color: var(--muted); }
+  .top { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--surface); }
+  .tag.real { color: var(--ok); border-color: var(--ok); }
+  .concepts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 16px 0 20px; }
+  .concept { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; }
+  .concept b { display: block; font-size: 14px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+  .card-head { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; }
+  .expect { font-size: 13px; }
+  button { font: inherit; font-weight: 600; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 7px 14px; cursor: pointer; white-space: nowrap; }
+  button.primary { background: var(--info); border-color: var(--info); color: #fff; }
+  button:disabled { opacity: .5; cursor: progress; }
+  svg.diagram { width: 100%; max-width: 520px; height: auto; margin: 10px 0 4px; display: block; }
+  svg.diagram text { fill: var(--text); font: 12px system-ui, sans-serif; }
+  svg.diagram .box { fill: var(--bg); stroke: var(--border); }
+  svg.diagram .pool { fill: var(--info-soft); stroke: var(--info); }
+  svg.diagram .badbox { fill: var(--bad-soft); stroke: var(--bad); }
+  svg.diagram .goodbox { fill: var(--ok-soft); stroke: var(--ok); }
+  svg.diagram .arrow { stroke: var(--muted); fill: none; stroke-width: 1.5; marker-end: url(#arr); }
+  svg.diagram .arrow.bad { stroke: var(--bad); }
+  svg.diagram .small { font-size: 11px; fill: var(--muted); }
+  .verdict { margin-top: 12px; border-radius: 10px; padding: 12px 14px; border: 1px solid var(--border); background: var(--bg); }
+  .verdict .badge { display: inline-block; font-weight: 800; font-size: 20px; letter-spacing: .02em; margin-right: 8px; }
+  .v-BLOCKED { background: var(--bad-soft); border-color: var(--bad); } .v-BLOCKED .badge { color: var(--bad); }
+  .v-NOT-BLOCKED, .v-PASS, .v-OK { background: var(--ok-soft); border-color: var(--ok); } .v-NOT-BLOCKED .badge, .v-PASS .badge, .v-OK .badge { color: var(--ok); }
+  .v-INCONCLUSIVE { background: var(--warn-soft); border-color: var(--warn); } .v-INCONCLUSIVE .badge { color: var(--warn); }
+  .v-FAIL, .v-ERROR { background: var(--bad-soft); border-color: var(--bad); } .v-FAIL .badge, .v-ERROR .badge { color: var(--bad); }
+  .v-running { background: var(--info-soft); border-color: var(--info); } .v-running .badge { color: var(--info); }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .stat { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; background: var(--surface); font-size: 13px; }
+  .stat b { font-size: 18px; display: block; }
+  .stat.big { border-color: var(--info); background: var(--info-soft); }
+  .stat.big b { font-size: 24px; }
+  .check { margin-top: 12px; border: 1px dashed var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13.5px; }
+  .check pre { margin: 6px 0 0; background: var(--code); padding: 8px 10px; border-radius: 6px; overflow-x: auto; font-size: 12.5px; white-space: pre; }
+  .check button { padding: 3px 10px; font-size: 12.5px; margin-left: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border-radius: 8px; padding: 6px 10px; font-size: 12.5px; border: 1px solid var(--border); background: var(--bg); }
+  .chip b { font-size: 13.5px; }
+  .chip.bad { border-color: var(--bad); background: var(--bad-soft); }
+  .chip.good { border-color: var(--ok); background: var(--ok-soft); }
+  .chip.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .tablewrap { max-height: 360px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { position: sticky; top: 0; background: var(--surface); font-weight: 600; z-index: 1; }
+  td.pid { font-variant-numeric: tabular-nums; font-weight: 600; }
+  tr.r-bad td { background: var(--bad-soft); }
+  tr.r-ok td.res { color: var(--ok); font-weight: 600; }
+  tr.r-bad td.res { color: var(--bad); font-weight: 700; }
+  tr.r-set td { background: var(--warn-soft); }
+  tr.r-admin td { color: var(--muted); font-style: italic; }
+  .ro-on { color: var(--bad); font-weight: 700; }
+  ul.tight { margin: 4px 0; padding-left: 20px; font-size: 13.5px; }
+  .admin { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .full { margin-top: 16px; }
+  details summary { cursor: pointer; font-weight: 600; margin-top: 10px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+  .lead { font-size: 14px; }
+  .runs { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 12px; }
+  .runs > div { min-width: 0; }
+  .strip { width: 100%; height: auto; display: block; margin-top: 6px; }
+  .strip text { fill: var(--muted); font: 16px system-ui, sans-serif; }
+  .strip .lbl { fill: var(--text); font-weight: 600; }
+  .strip .ok { fill: var(--ok); } .strip .bad { fill: var(--bad); } .strip .other { fill: var(--warn); }
+  .strip .mark { stroke: var(--info); stroke-dasharray: 3 3; }
+  .strip .poison { stroke: var(--bad); stroke-dasharray: 3 3; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  @media (max-width: 600px) { h1 { font-size: 21px; } .verdict .badge { font-size: 17px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <h1>Does a read-only setting leak through the connection pool?</h1>
+      <p class="muted" id="target">Loading target…</p>
+    </div>
+    <div class="admin">
+      <button class="primary" id="runAll">Run all experiments</button>
+    </div>
+  </div>
+
+  <div class="concepts">
+    <div class="concept"><b>Connection</b>What your program opens to the pooler. Closing it does <em>not</em> close the database process behind it.</div>
+    <div class="concept"><b>Login role</b>The database user (<code>test_app</code>, <code>test_delivery</code>). A backend is logged in as one role for its whole life.</div>
+    <div class="concept"><b>Pool</b>Supavisor keeps a set of backends per <em>role + mode</em>. In transaction mode, each transaction borrows whichever backend is free.</div>
+    <div class="concept"><b>Backend PID</b><code>pg_backend_pid()</code> — the ID of the real Postgres process. Same PID = same process = same leftover settings.</div>
+  </div>
+
+  <section class="card" id="card-realistic">
+    <div class="card-head">
+      <div>
+        <h2>Realistic test · app, hub and assessment keep writing while a migration runs</h2>
+        <p class="lead muted">Tables <code>learners</code>, <code>assessments</code>, <code>submissions</code>, <code>hub_events</code> in schema <code>realistic_test</code> (fake data).
+        Six service connections (2 each for app, hub, assessment) write for 30 s through <b>one shared login</b> <code>test_shared</code> on the transaction pooler, like your single connection string.
+        At 6 s a migration adds a column, backfills, then runs a "verification" step that does a session-level <code>SET default_transaction_read_only = on</code> and disconnects.</p>
+        <p class="lead"><b>Run 1</b>: the migration uses the same shared login → expected <b>BLOCKED</b> (some writes fail, which ones is luck).
+        <b>Run 2</b>: the migration uses its own login <code>test_migrator</code> → expected <b>NOT BLOCKED</b>.</p>
+      </div>
+    </div>
+    <div class="admin">
+      <button data-run="realisticShared" class="primary">Run 1 · shared login</button>
+      <button data-run="realisticOwnTx" class="primary">Run 2 · own login (:6543)</button>
+      <button data-run="realisticOwnSession">Run 2 · own login (:5432 session)</button>
+      <button data-run="realisticSetup">Setup realistic tables</button>
+      <span id="realMsg" class="muted"></span>
+    </div>
+    <div class="runs">
+      <div><h3>Run 1 · shared login</h3><div class="verdict" id="v-realisticShared"><span class="badge">Not run yet</span></div><div id="d-realisticShared"></div></div>
+      <div><h3>Run 2 · migration on its own login, transaction pooler :6543</h3><div class="verdict" id="v-realisticOwnTx"><span class="badge">Not run yet</span></div><div id="d-realisticOwnTx"></div></div>
+      <div><h3>Run 2 · migration on its own login, session pooler :5432</h3><div class="verdict" id="v-realisticOwnSession"><span class="badge">Not run yet</span></div><div id="d-realisticOwnSession"></div></div>
+    </div>
+  </section>
+
+  <h2 style="margin:28px 0 10px">Focused experiments</h2>
+  <div class="grid2">
+    <!-- Experiment A -->
+    <section class="card" id="card-samePool">
+      <div class="card-head">
+        <div>
+          <h2>A · Same login, same pool</h2>
+          <p class="expect muted">Script and app both log in as <code>test_app</code> via the transaction pool. Script runs a session-level <code>SET default_transaction_read_only = on</code>, commits, disconnects. <b>Expected: app writes BLOCKED (25006).</b></p>
+        </div>
+        <button data-run="samePool">Run</button>
+      </div>
+      <svg class="diagram" viewBox="0 0 520 150" role="img" aria-label="Both clients share the test_app pool and backend">
+        <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker></defs>
+        <rect class="box" x="6" y="14" width="150" height="44" rx="8"/><text x="16" y="33">Client A · ad-hoc script</text><text class="small" x="16" y="49">login test_app</text>
+        <rect class="box" x="6" y="92" width="150" height="44" rx="8"/><text x="16" y="111">Client B · application</text><text class="small" x="16" y="127">login test_app</text>
+        <rect class="pool" x="196" y="40" width="130" height="70" rx="8"/><text x="208" y="66">Supavisor pool</text><text class="small" x="208" y="84">test_app · transaction</text><text class="small" x="208" y="99">:6543</text>
+        <rect class="badbox" x="366" y="40" width="148" height="70" rx="8"/><text x="378" y="66">Postgres backend</text><text class="small" x="378" y="84">same PID reused</text><text class="small" x="378" y="99">read_only = on ✗</text>
+        <path class="arrow" d="M156,36 C176,36 176,60 194,62"/><path class="arrow bad" d="M156,114 C176,114 176,90 194,88"/><path class="arrow bad" d="M326,75 L364,75"/>
+      </svg>
+      <div class="verdict" id="v-samePool"><span class="badge">Not run yet</span></div>
+      <div id="d-samePool"></div>
+    </section>
+
+    <!-- Experiment B -->
+    <section class="card" id="card-separateRole">
+      <div class="card-head">
+        <div>
+          <h2>B · Delivery has its own login</h2>
+          <p class="expect muted">Delivery logs in as <code>test_delivery</code> (transaction pool <em>and</em> session pool) and sets the same session-level read-only. App keeps writing as <code>test_app</code>. <b>Expected: app writes NOT blocked.</b></p>
+        </div>
+        <button data-run="separateRole">Run</button>
+      </div>
+      <svg class="diagram" viewBox="0 0 520 150" role="img" aria-label="Delivery and app use separate pools and backends">
+        <rect class="box" x="6" y="14" width="150" height="44" rx="8"/><text x="16" y="33">Delivery</text><text class="small" x="16" y="49">login test_delivery</text>
+        <rect class="box" x="6" y="92" width="150" height="44" rx="8"/><text x="16" y="111">Application</text><text class="small" x="16" y="127">login test_app</text>
+        <rect class="pool" x="196" y="10" width="130" height="52" rx="8"/><text x="208" y="32">pool test_delivery</text><text class="small" x="208" y="49">:6543 and :5432</text>
+        <rect class="pool" x="196" y="88" width="130" height="52" rx="8"/><text x="208" y="110">pool test_app</text><text class="small" x="208" y="127">transaction :6543</text>
+        <rect class="badbox" x="366" y="10" width="148" height="52" rx="8"/><text x="378" y="32">Delivery's backends</text><text class="small" x="378" y="49">read_only = on (theirs only)</text>
+        <rect class="goodbox" x="366" y="88" width="148" height="52" rx="8"/><text x="378" y="110">App's backends</text><text class="small" x="378" y="127">read_only = off ✓</text>
+        <path class="arrow" d="M156,36 L194,36"/><path class="arrow" d="M156,114 L194,114"/><path class="arrow" d="M326,36 L364,36"/><path class="arrow" d="M326,114 L364,114"/>
+      </svg>
+      <div class="verdict" id="v-separateRole"><span class="badge">Not run yet</span></div>
+      <div id="d-separateRole"></div>
+    </section>
+  </div>
+
+  <section class="card full" id="card-safePattern">
+    <div class="card-head">
+      <div>
+        <h2>C · Same login, same pool, but transaction-scoped read-only</h2>
+        <p class="expect muted">Script uses <code>BEGIN READ ONLY</code> and <code>SET LOCAL</code> instead of a session-level <code>SET</code>. <b>Expected: app NOT blocked, even when it reuses the script's backend.</b></p>
+      </div>
+      <button data-run="safePattern">Run</button>
+    </div>
+    <div class="verdict" id="v-safePattern"><span class="badge">Not run yet</span></div>
+    <div id="d-safePattern"></div>
+  </section>
+
+  <div class="grid2 full">
+    <section class="card" id="card-baseline">
+      <div class="card-head">
+        <div><h2>Test 1 · Baseline</h2><p class="expect muted">Each client is logged in as the intended role; the app can insert.</p></div>
+        <button data-run="baseline">Run</button>
+      </div>
+      <div class="verdict" id="v-baseline"><span class="badge">Not run yet</span></div>
+      <div id="d-baseline"></div>
+    </section>
+    <section class="card" id="card-permissions">
+      <div class="card-head">
+        <div><h2>Test 4 · Permissions</h2><p class="expect muted">Read-only human can't write, Delivery can't become the app, maintenance is narrow.</p></div>
+        <button data-run="permissions">Run</button>
+      </div>
+      <div class="verdict" id="v-permissions"><span class="badge">Not run yet</span></div>
+      <div id="d-permissions"></div>
+    </section>
+  </div>
+
+  <section class="card full">
+    <h2>Housekeeping</h2>
+    <p class="muted">Only <code>test_*</code> roles and the <code>pool_test</code> schema on the allow-listed project are ever touched.</p>
+    <div class="admin">
+      <button data-run="setup">Setup roles &amp; table</button>
+      <button data-run="recycle">Recycle test backends</button>
+      <button data-run="cleanup" data-confirm="Drop all test roles and the pool_test schema?">Cleanup everything</button>
+      <span id="adminMsg" class="muted"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const OPTS = { samePool: { poisonConnections: 1, attempts: 15 }, separateRole: { attempts: 20 }, safePattern: { attempts: 15 } };
+const ADMIN = new Set(['setup', 'recycle', 'cleanup']);
+
+fetch('/api/info').then((r) => r.json()).then((info) => {
+  $('#target').innerHTML = `Target: disposable Supabase project <code>${esc(info.projectRef)}</code> · <span class="tag real">real hosted Supavisor</span> · app path <code>${esc(info.paths.appTx.endpoint)}</code>`;
+});
+
+function rowClass(e) {
+  if (e.mode === 'admin') return 'r-admin';
+  if (/^ERROR|FAIL/.test(e.result)) return 'r-bad';
+  if (/SETTING APPLIED/.test(e.result)) return 'r-set';
+  if (/^OK|^PASS/.test(e.result)) return 'r-ok';
+  return '';
+}
+
+function backendMap(events) {
+  const by = new Map();
+  for (const e of events) {
+    if (e.pid == null || e.mode === 'admin') continue;
+    const b = by.get(e.pid) ?? { pid: e.pid, roles: new Set(), clients: new Set(), on: false, ok: 0, rejected: 0 };
+    b.roles.add(e.loginRole); b.clients.add(e.client.replace(/ #\d+$/, ''));
+    if (e.defaultReadOnly === 'on') b.on = true;
+    if (/^write/.test(e.step)) e.result === 'OK' ? b.ok++ : b.rejected++;
+    by.set(e.pid, b);
+  }
+  if (!by.size) return '';
+  return `<h3>Backends seen (Postgres processes)</h3><div class="chips">${[...by.values()].map((b) => `
+    <div class="chip ${b.rejected || (b.on && b.roles.has('test_app')) ? 'bad' : b.on ? 'warn' : 'good'}">
+      <b>PID ${b.pid}</b> · ${[...b.roles].map(esc).join(', ')} · read_only=${b.on ? '<span class="ro-on">on</span>' : 'off'}<br>
+      <span class="muted">${[...b.clients].map(esc).join(' + ')}${b.on && !b.roles.has('test_app') ? ' — read-only on purpose, only affects this role' : ''}</span>${b.ok + b.rejected ? `<br>app writes: ${b.ok} ok, <span class="${b.rejected ? 'ro-on' : ''}">${b.rejected} rejected</span>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+function stats(r) {
+  const ev = r.evidence;
+  if (!ev) return '';
+  const items = [];
+  if ('rowsSavedInTable' in ev) items.push(['Rows actually saved in the table', ev.rowsSavedInTable, 'big']);
+  if ('okWrites' in ev) items.push(['App writes OK', ev.okWrites]);
+  if ('rejectedWrites' in ev) items.push(['App writes rejected', ev.rejectedWrites]);
+  if (ev.poisonedPids) items.push(['Poisoned PIDs', ev.poisonedPids.join(', ')]);
+  if (ev.deliveryPids) items.push(['Delivery PIDs', ev.deliveryPids.join(', ')]);
+  if (ev.appPids) items.push(['App PIDs', ev.appPids.join(', ')]);
+  if (ev.overlap) items.push(['Shared PIDs', ev.overlap.length ? ev.overlap.join(', ') : 'none']);
+  if ('writesOnScriptBackend' in ev) items.push(["Writes on script's backend", ev.writesOnScriptBackend]);
+  return `<div class="stats">${items.map(([k, v, cls]) => `<div class="stat ${cls ?? ''}"><b>${esc(v)}</b>${esc(k)}</div>`).join('')}</div>`;
+}
+
+function timeline(events) {
+  if (!events?.length) return '';
+  return `<h3>Timeline (each row captured together)</h3><div class="tablewrap"><table>
+    <thead><tr><th>DB time (UTC)</th><th>Client</th><th>Login role</th><th>Mode</th><th>Backend PID</th><th>default_ro</th><th>Step</th><th>Result</th></tr></thead>
+    <tbody>${events.map((e) => `<tr class="${rowClass(e)}">
+      <td>${esc(e.dbTime ?? e.at.slice(11, 23))}</td><td>${esc(e.client)}</td><td>${esc(e.loginRole)}</td><td>${esc(e.mode)}</td>
+      <td class="pid">${esc(e.pid ?? '')}</td><td class="${e.defaultReadOnly === 'on' ? 'ro-on' : ''}">${esc(e.defaultReadOnly ?? '')}</td>
+      <td>${esc(e.step)}${e.detail && !/^OK$/.test(e.result) ? `<br><span class="muted">${esc(e.detail)}</span>` : ''}</td>
+      <td class="res">${esc(e.result)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function render(name, r) {
+  const v = $(`#v-${name}`);
+  v.className = `verdict v-${String(r.verdict).replace(' ', '-')}`;
+  v.innerHTML = `<span class="badge">${esc(r.verdict)}</span>${esc(r.headline ?? '')}${r.seconds ? ` <span class="muted">(${r.seconds.toFixed(1)}s)</span>` : ''}`;
+  const sql = r.evidence?.viewSql;
+  const check = sql ? `<div class="check"><b>Check it yourself in Supabase:</b> Dashboard → SQL Editor → paste and run.
+    A rejected write leaves no row, so the number of rows here is the number of writes that really happened.
+    <button data-copy="${esc(sql)}">Copy SQL</button><pre>${esc(sql)}</pre></div>` : '';
+  $(`#d-${name}`).innerHTML = stats(r) + check + backendMap(r.events ?? []) +
+    (r.proves?.length ? `<h3>What this shows</h3><ul class="tight">${r.proves.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : '') +
+    (r.notProven?.length ? `<h3>Not shown by this run</h3><ul class="tight">${r.notProven.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : '') +
+    (r.events?.length ? `<details ${name === 'permissions' || name === 'baseline' ? '' : 'open'}><summary>Full timeline (${r.events.length} rows)</summary>${timeline(r.events)}</details>` : '');
+}
+
+function strip(r) {
+  const W = 1000, rowH = 34, top = 24, left = 120, services = ['app', 'hub', 'assessment'];
+  const x = (t) => left + (Math.min(t, r.durationMs) / r.durationMs) * (W - left - 10);
+  const H = top + services.length * rowH + 24;
+  const ticks = r.records.map((rec) => {
+    const y = top + services.indexOf(rec.service) * rowH + 4;
+    const cls = rec.result === 'OK' ? 'ok' : rec.result === 'ERROR 25006' ? 'bad' : 'other';
+    return `<rect class="${cls}" x="${x(rec.t).toFixed(1)}" y="${y}" width="3" height="${rowH - 8}"><title>${esc(rec.service)} ${(rec.t / 1000).toFixed(1)}s PID ${rec.pid} ${esc(rec.result)}</title></rect>`;
+  }).join('');
+  const labels = services.map((sv, i) => `<text class="lbl" x="4" y="${top + i * rowH + 22}">${sv}</text>`).join('');
+  const marks = `<line class="mark" x1="${x(r.migrationAt)}" x2="${x(r.migrationAt)}" y1="10" y2="${H - 14}"/><text x="${x(r.migrationAt) + 4}" y="16">migration starts</text>
+    <line class="poison" x1="${x(r.poisonAt)}" x2="${x(r.poisonAt)}" y1="10" y2="${H - 14}"/><text x="${x(r.poisonAt) + 3}" y="${H - 3}">read-only SET by migration</text>
+    <text x="${left}" y="${H - 3}">0 s</text><text x="${W - 46}" y="${H - 3}">${(r.durationMs / 1000).toFixed(0)} s</text>`;
+  return `<svg class="strip" viewBox="0 0 ${W} ${H}" role="img" aria-label="Each service write over time, green saved, red rejected">${labels}${marks}${ticks}</svg>
+    <div class="legend"><span><i style="background:var(--ok)"></i>write saved</span><span><i style="background:var(--bad)"></i>rejected 25006 (read-only)</span><span><i style="background:var(--warn)"></i>other error</span></div>`;
+}
+
+function renderRealistic(name, r) {
+  const v = $(`#v-${name}`);
+  v.className = `verdict v-${String(r.verdict).replace(' ', '-')}`;
+  v.innerHTML = `<span class="badge">${esc(r.verdict)}</span>${esc(r.headline ?? '')}${r.seconds ? ` <span class="muted">(${r.seconds.toFixed(0)}s)</span>` : ''}`;
+  if (!r.services) { $(`#d-${name}`).innerHTML = ''; return; }
+  const ev = r.evidence;
+  const statsHtml = `<div class="stats">
+    <div class="stat big"><b>${ev.rowsSavedInTable}</b>rows actually saved in the tables</div>
+    <div class="stat"><b>${ev.serviceWritesAttempted}</b>service writes attempted</div>
+    <div class="stat"><b>${ev.serviceWritesRejected25006}</b>rejected 25006</div>
+    <div class="stat"><b>${ev.sharedPids.length ? esc(ev.sharedPids.join(', ')) : 'none'}</b>backends shared by services &amp; migration</div>
+    <div class="stat"><b>${esc(ev.migrationReadOnlyPids.join(', '))}</b>backends the migration made read-only</div>
+    <div class="stat"><b>${ev.migrationColumnApplied ? 'yes' : 'no'}</b>migration column applied</div></div>`;
+  const svc = `<h3>Per service (saved = counted from the table after the run)</h3><div class="tablewrap"><table>
+    <thead><tr><th>Service</th><th>Writes into</th><th>Attempted</th><th>Saved in table</th><th>Rejected 25006</th><th>Other errors</th><th>Login recorded in rows</th></tr></thead>
+    <tbody>${r.services.map((s) => `<tr class="${s.rejected25006 ? 'r-bad' : 'r-ok'}"><td>${esc(s.service)}</td><td><code>${esc(s.table)}</code></td>
+      <td class="num">${s.attempted}</td><td class="num"><b>${s.savedInTable}</b></td><td class="num">${s.rejected25006}</td><td class="num">${s.otherErrors}</td><td>${esc(s.loginRolesInTable)}</td></tr>`).join('')}</tbody></table></div>`;
+  const mig = `<h3>Migration steps (${esc(r.migrationPath)})</h3><div class="tablewrap"><table>
+    <thead><tr><th>At</th><th>Client</th><th>Login</th><th>Backend PID</th><th>default_ro</th><th>Step</th><th>Result</th></tr></thead>
+    <tbody>${r.migrationLog.map((m) => `<tr class="${/SETTING/.test(m.result) ? 'r-set' : ''}"><td>${(m.t / 1000).toFixed(1)}s</td><td>${esc(m.client)}</td><td>${esc(m.loginRole ?? '')}</td><td class="pid">${esc(m.pid ?? '')}</td>
+      <td class="${m.ro === 'on' ? 'ro-on' : ''}">${esc(m.ro ?? '')}</td><td>${esc(m.step)}${m.detail ? `<br><span class="muted">${esc(m.detail)}</span>` : ''}</td><td>${esc(m.result)}</td></tr>`).join('')}</tbody></table></div>`;
+  const check = `<div class="check"><b>Check it yourself in Supabase:</b> SQL Editor → paste and run. A rejected write is rolled back and leaves no row.
+    <button data-copy="${esc(ev.viewSql)}">Copy SQL</button><pre>${esc(ev.viewSql)}</pre></div>`;
+  const server = r.events.find((e) => /snapshot/i.test(e.step));
+  $(`#d-${name}`).innerHTML = statsHtml + `<h3>Every service write over time</h3>` + strip(r) + svc + mig +
+    (server ? `<p class="muted" style="font-size:13px">Server view at the end of the run (PID = login): ${esc(server.detail)}</p>` : '') + check +
+    `<h3>What this shows</h3><ul class="tight">${r.proves.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` +
+    `<h3>Not shown by this run</h3><ul class="tight">${r.notProven.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`;
+}
+
+async function run(name) {
+  const buttons = document.querySelectorAll('button');
+  buttons.forEach((b) => (b.disabled = true));
+  const isAdmin = ADMIN.has(name);
+  const msgEl = name === 'realisticSetup' ? $('#realMsg') : $('#adminMsg');
+  if (isAdmin || name === 'realisticSetup') msgEl.textContent = `Running ${name}…`;
+  else { const v = $(`#v-${name}`); v.className = 'verdict v-running'; v.innerHTML = `<span class="badge">Running…</span>talking to Supavisor, this takes ${name.startsWith('realistic') ? 'about 45' : '15–60'} s`; }
+  try {
+    const res = await fetch(`/api/run/${name}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(OPTS[name] ?? {}) });
+    const r = await res.json();
+    if (!res.ok) throw new Error(r.error);
+    if (isAdmin || name === 'realisticSetup') msgEl.textContent = r.headline ?? `${name}: done (${(r.terminated ?? []).length} backends terminated)`;
+    else if (name.startsWith('realistic')) renderRealistic(name, r);
+    else render(name, r);
+  } catch (err) {
+    if (isAdmin || name === 'realisticSetup') msgEl.textContent = `${name} failed: ${err.message}`;
+    else (name.startsWith('realistic') ? renderRealistic : render)(name, { verdict: 'ERROR', headline: err.message });
+  } finally {
+    buttons.forEach((b) => (b.disabled = false));
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const c = e.target.closest('button[data-copy]');
+  if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => (c.textContent = 'Copied')).catch(() => {}); return; }
+  const b = e.target.closest('button[data-run]');
+  if (!b) return;
+  if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
+  run(b.dataset.run);
+});
+$('#runAll').addEventListener('click', async () => {
+  for (const n of ['baseline', 'samePool', 'separateRole', 'safePattern', 'permissions']) await run(n);
+});
+</script>
+</body>
+</html>

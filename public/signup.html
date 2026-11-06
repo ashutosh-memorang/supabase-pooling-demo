@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign-up Breakage Demo</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --text: #1b1f24; --muted: #5d6673; --border: #dde1e6;
+    --ok: #1a7f37; --ok-soft: #e6f4ea; --bad: #c62828; --bad-soft: #fdecea;
+    --info: #0b5cad; --info-soft: #e8f1fb; --warn: #9a6700; --warn-soft: #fff4d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --surface: #171b21; --text: #e6e9ed; --muted: #9aa4b1; --border: #2a313a;
+      --ok: #4ac26b; --ok-soft: #12261a; --bad: #ff6b6b; --bad-soft: #2d1515;
+      --info: #58a6ff; --info-soft: #10213a; --warn: #e3b341; --warn-soft: #2b2310;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 18px 0 22px; }
+  .step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 14.5px; }
+  .step b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input { width: 100%; font: inherit; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  button { font: inherit; font-weight: 650; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 11px 16px; cursor: pointer; width: 100%; margin-top: 12px; text-align: left; }
+  button small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  button:disabled { opacity: .55; cursor: progress; }
+  .signup { background: var(--info); border-color: var(--info); color: #fff; text-align: center; font-size: 17px; }
+  .same { border-color: var(--bad); background: var(--bad-soft); }
+  .own { border-color: var(--ok); background: var(--ok-soft); }
+  .reset { width: auto; padding: 6px 12px; font-weight: 500; font-size: 14px; text-align: center; }
+  .banner { margin-top: 14px; border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); background: var(--bg); min-height: 56px; }
+  .banner .big { font-size: 20px; font-weight: 800; }
+  .banner.ok { background: var(--ok-soft); border-color: var(--ok); } .banner.ok .big { color: var(--ok); }
+  .banner.bad { background: var(--bad-soft); border-color: var(--bad); } .banner.bad .big { color: var(--bad); }
+  .banner.info { background: var(--info-soft); border-color: var(--info); }
+  .counter { margin-top: 10px; font-size: 14px; color: var(--muted); }
+  .counter b { color: var(--text); font-size: 16px; }
+  .log { list-style: none; padding: 0; margin: 10px 0 0; }
+  .log li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+  .log li:last-child { border-bottom: 0; }
+  .log .time { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; font-size: 13px; }
+  .log .why { display: block; color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .log .tech { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; font-family: ui-monospace, Menlo, monospace; }
+  .empty { color: var(--muted); font-size: 14px; }
+  .foot { margin-top: 18px; font-size: 13.5px; }
+  a { color: var(--info); }
+  @media (max-width: 600px) { h1 { font-size: 23px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Can a developer's script break sign-ups?</h1>
+  <p class="muted">A real sign-up form writing to your test Supabase database through Supavisor, and a script like the one from the incident. Try it in this order:</p>
+
+  <div class="steps">
+    <div class="step"><b>1 · Sign up</b>It works. The new user is saved.</div>
+    <div class="step"><b>2 · Run the script with the app's login, then sign up</b>Sign-up fails: the database refuses the write.</div>
+    <div class="step"><b>3 · Reset, run the script with its own login, then sign up</b>Sign-up works, during and after the script.</div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>The app: sign-up form</h2>
+      <p class="muted" style="margin:0;font-size:14px">Logs in to the database with the app's login.</p>
+      <label for="name">Name</label>
+      <input id="name" autocomplete="off">
+      <label for="email">Email</label>
+      <input id="email" autocomplete="off">
+      <button class="signup" id="signupBtn">Sign up</button>
+      <div class="banner" id="banner"><span class="muted">Press "Sign up" to try it.</span></div>
+      <div class="counter">Users saved in the database: <b id="count">–</b></div>
+    </section>
+
+    <section class="card">
+      <h2>The developer's script</h2>
+      <p class="muted" style="margin:0;font-size:14px">Does what the incident script did: switches its database connections to <b>read-only</b> "to be safe", runs a check, and exits.</p>
+      <button class="same" data-script="same">Run script using the <u>app's</u> login
+        <small>Same login as the sign-up form, like using the same connection string</small></button>
+      <button class="own" data-script="own">Run script using its <u>own</u> login
+        <small>A separate database user just for scripts and migrations</small></button>
+      <div class="banner" id="scriptBanner"><span class="muted">The script hasn't run yet.</span></div>
+      <div style="margin-top:12px">
+        <button class="reset" id="resetBtn">Reset connections</button>
+        <span class="muted" style="font-size:13px">&nbsp;Clears any read-only connections, like restarting the pool.</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>What happened</h2>
+    <ul class="log" id="log"><li class="empty">Nothing yet.</li></ul>
+  </section>
+
+  <p class="foot muted" id="foot">Under the hood: the app uses <code>APP_DATABASE_URL</code> (Supavisor transaction pooler :6543). The script uses
+    <code>APP_DATABASE_URL</code> (same login) or <code>DELIVERY_DATABASE_URL</code> (own login). Users go into <code>public.signups</code>.</p>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const NAMES = ['Priya', 'Arjun', 'Meera', 'Rahul', 'Ananya', 'Vikram', 'Sara', 'Kabir', 'Isha', 'Rohan', 'Neha', 'Dev'];
+let lastScript = null; // 'same' | 'own' | null
+
+function freshUser() {
+  const n = NAMES[Math.floor(Math.random() * NAMES.length)];
+  $('#name').value = n;
+  $('#email').value = `${n.toLowerCase()}.${Math.floor(Math.random() * 9000 + 1000)}@example.test`;
+}
+const time = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+function log(icon, text, why = '', tech = '', at = new Date().toISOString()) {
+  const ul = $('#log');
+  ul.querySelector('.empty')?.remove();
+  const li = document.createElement('li');
+  li.innerHTML = `<span class="time">${time(at)}</span>${icon} ${text}${why ? `<span class="why">${why}</span>` : ''}${tech ? `<span class="tech">${esc(tech)}</span>` : ''}`;
+  ul.prepend(li);
+}
+
+function busy(on) { document.querySelectorAll('button').forEach((b) => (b.disabled = on)); }
+
+async function api(path, body) {
+  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+$('#signupBtn').addEventListener('click', async () => {
+  busy(true);
+  $('#banner').className = 'banner'; $('#banner').innerHTML = '<span class="muted">Signing up…</span>';
+  try {
+    const r = await api('/api/signup', { name: $('#name').value, email: $('#email').value });
+    $('#count').textContent = r.totalUsers;
+    const tech = `database process ${r.pid} · read-only = ${r.readOnly}${r.ok ? ` · saved as row id ${r.id}` : ` · error ${r.code}`}`;
+    if (r.ok) {
+      $('#banner').className = 'banner ok';
+      $('#banner').innerHTML = `<div class="big">✅ Welcome, ${esc(r.name)}!</div>Account created and saved in the database.`;
+      log('✅', `<b>Sign-up worked</b> for ${esc(r.name)}.`,
+        lastScript === 'own' ? 'The script used its own login, so it could only make its own connections read-only. The app\'s connections were untouched.' : '', tech, r.at);
+      freshUser();
+    } else {
+      $('#banner').className = 'banner bad';
+      $('#banner').innerHTML = `<div class="big">❌ Sign-up failed</div>The database said: <i>${esc(r.error)}</i>`;
+      log('❌', `<b>Sign-up failed</b> for ${esc(r.name)}. The database said: "${esc(r.error)}".`,
+        r.readOnly === 'on'
+          ? 'Why: the app and the script use the same login, so they share the same pool of database connections. The script left some of them in read-only mode and exited, and the app was handed one of those.'
+          : '', tech, r.at);
+    }
+  } catch (err) {
+    $('#banner').className = 'banner bad'; $('#banner').textContent = `Could not reach the database: ${err.message}`;
+  } finally { busy(false); }
+});
+
+document.querySelectorAll('[data-script]').forEach((b) => b.addEventListener('click', async () => {
+  const which = b.dataset.script;
+  busy(true);
+  $('#scriptBanner').className = 'banner info'; $('#scriptBanner').innerHTML = 'Script running…';
+  try {
+    const r = await api('/api/script', { login: which });
+    lastScript = which;
+    const loginText = which === 'own' ? 'its <b>own</b> login' : 'the <b>app\'s</b> login';
+    $('#scriptBanner').className = 'banner info';
+    $('#scriptBanner').innerHTML = `Script finished using ${loginText}. It switched ${r.pids.length} database connections to read-only, ran its check, and exited.<br><b>Now try signing up.</b>`;
+    log('🔧', `<b>Script ran</b> using ${loginText} (<code>${esc(r.login)}</code>). It set read-only on ${r.pids.length} database connections, then exited.`,
+      which === 'same' ? 'Those connections belong to the same pool the sign-up form uses.' : 'Those connections belong to the script\'s own pool, separate from the app\'s.',
+      `read-only database processes: ${r.pids.join(', ')}`, r.at);
+  } catch (err) {
+    $('#scriptBanner').className = 'banner bad'; $('#scriptBanner').textContent = `Script failed: ${err.message}`;
+  } finally { busy(false); }
+}));
+
+$('#resetBtn').addEventListener('click', async () => {
+  busy(true);
+  try {
+    const r = await api('/api/reset');
+    lastScript = null;
+    $('#count').textContent = r.totalUsers;
+    $('#scriptBanner').className = 'banner'; $('#scriptBanner').innerHTML = '<span class="muted">Connections reset. The script hasn\'t run since.</span>';
+    $('#banner').className = 'banner'; $('#banner').innerHTML = '<span class="muted">Press "Sign up" to try it.</span>';
+    log('🔄', '<b>Connections reset.</b> Every demo database connection was restarted, so no read-only ones are left.', '', `${r.terminated} database processes restarted`, r.at);
+  } catch (err) {
+    log('⚠️', `Reset failed: ${esc(err.message)}`);
+  } finally { busy(false); }
+});
+
+freshUser();
+fetch('/api/users').then((r) => r.json()).then((d) => {
+  $('#count').textContent = d.totalUsers ?? '–';
+  if (d.logins) $('#foot').insertAdjacentHTML('beforeend', ` Logins: app = <code>${esc(d.logins.app)}</code>, delivery = <code>${esc(d.logins.delivery)}</code>.`);
+}).catch(() => {});
+</script>
+</body>
+</html>

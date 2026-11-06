@@ -1,0 +1,16 @@
+# Secrets: connection strings and generated passwords live here. Never commit.
+.env
+.env.*
+!.env.example
+
+node_modules/
+
+# Local tool state
+supabase/
+.claude/
+.DS_Store
+
+# Raw run output (PIDs/timestamps); the markdown reports are kept
+results/*.json
+results/*.log
+*.log

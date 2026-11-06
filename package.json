@@ -1,0 +1,29 @@
+{
+  "name": "testing-pooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shows how a script that shares the app's database login can break app writes through Supavisor's transaction pool, and how a separate login prevents it.",
+  "type": "module",
+  "scripts": {
+    "demo": "node server.mjs",
+    "demo:setup": "node scripts/demo/setup.mjs",
+    "signup": "node scripts/demo/signup.mjs",
+    "delivery:app-login": "node scripts/demo/delivery-script.mjs --app",
+    "delivery:own-login": "node scripts/demo/delivery-script.mjs --own",
+    "demo:reset": "node scripts/demo/reset.mjs",
+    "demo:check": "node scripts/demo/check.mjs",
+    "demo:cleanup": "node scripts/demo/cleanup.mjs",
+    "lab:init-env": "node scripts/init-env.mjs",
+    "lab:setup": "node scripts/setup.mjs",
+    "lab:test": "node scripts/run-all.mjs",
+    "lab:realistic": "node scripts/run-realistic.mjs",
+    "lab:recycle": "node scripts/recycle.mjs",
+    "lab:cleanup": "node scripts/cleanup.mjs"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}
